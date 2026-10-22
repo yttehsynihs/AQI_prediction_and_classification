@@ -41,7 +41,7 @@ st.caption("Mini Project · Phase 3 · Streamlit deployment")
 
 with st.sidebar:
     st.header("About this app")
-    st.write("The app loads the best-performing regression and classification models selected using the Phase 2 test-set evaluation.")
+    st.write("This app uses trained machine learning models to predict Air Quality Index (AQI) values and classify air quality based on the provided environmental and pollutant data.")
     st.write(f"**Regression model:** {reg_name}")
     st.write(f"**Classification model:** {clf_name}")
     st.divider()
