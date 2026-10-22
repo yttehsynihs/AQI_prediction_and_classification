@@ -18,15 +18,29 @@ st.set_page_config(
 # Load trained models
 # --------------------------------------------------
 MODEL_PATH = Path(__file__).parent / "aqi_models.joblib"
-bundle = joblib.load(MODEL_PATH)
 
-reg_model = bundle["regression_model"]
-reg_name = bundle["regression_model_name"]
+try:
+    bundle = joblib.load(MODEL_PATH)
 
-clf_model = bundle["classification_model"]
-clf_name = bundle["classification_model_name"]
+    reg_model = bundle["regression_model"]
+    reg_name = bundle["regression_model_name"]
 
-cities = bundle["cities"]
+    clf_model = bundle["classification_model"]
+    clf_name = bundle["classification_model_name"]
+
+    cities = bundle["cities"]
+
+except FileNotFoundError:
+    st.error(
+        "Model file 'aqi_models.joblib' was not found. "
+        "Place it in the same folder as app.py."
+    )
+    st.stop()
+
+except Exception as exc:
+    st.error(f"Unable to load the trained models: {exc}")
+    st.stop()
+
 
 # --------------------------------------------------
 # Season feature
@@ -43,26 +57,7 @@ def season_from_month(month):
 
 
 # --------------------------------------------------
-# Calculate AQI category from numerical AQI
-# US-style AQI thresholds
-# --------------------------------------------------
-def get_aqi_category(aqi):
-    if aqi <= 50:
-        return "Good"
-    elif aqi <= 100:
-        return "Moderate"
-    elif aqi <= 150:
-        return "Unhealthy (Sensitive)"
-    elif aqi <= 200:
-        return "Unhealthy"
-    elif aqi <= 300:
-        return "Very Unhealthy"
-    else:
-        return "Hazardous"
-
-
-# --------------------------------------------------
-# Category descriptions
+# AQI category descriptions
 # --------------------------------------------------
 def category_description(category):
     descriptions = {
@@ -92,7 +87,7 @@ def category_description(category):
     }
 
     return descriptions.get(
-        category,
+        str(category),
         "Refer to your local air-quality authority for guidance."
     )
 
@@ -103,9 +98,9 @@ def category_description(category):
 st.title("🌿 Air Quality Index (AQI) Predictor")
 
 st.write(
-    "A machine-learning application for estimating numerical "
-    "AQI and calculating its air-quality category from pollutant "
-    "and weather measurements."
+    "A machine-learning application that predicts numerical "
+    "AQI using regression and predicts the air-quality category "
+    "using classification, based on pollutant and weather measurements."
 )
 
 st.caption("Mini Project · Phase 3 · Streamlit deployment")
@@ -118,12 +113,13 @@ with st.sidebar:
     st.header("About this app")
 
     st.write(
-        "This application uses a trained machine-learning "
-        "regression model to estimate AQI. The category is "
-        "calculated directly from the estimated numerical AQI."
+        "This application uses a trained regression model "
+        "to estimate numerical AQI and a trained classification "
+        "model to predict the AQI category."
     )
 
     st.write(f"**Regression model:** {reg_name}")
+    st.write(f"**Classification model:** {clf_name}")
 
     st.divider()
 
@@ -240,7 +236,7 @@ input_row = pd.DataFrame([{
 
 
 # --------------------------------------------------
-# Predict numerical AQI and calculate category
+# Predict AQI
 # --------------------------------------------------
 if st.button(
     "Predict AQI",
@@ -248,18 +244,20 @@ if st.button(
     use_container_width=True
 ):
     try:
-        # Predict numerical AQI
+        # Predict numerical AQI using regression
         predicted_aqi = float(
             reg_model.predict(input_row)[0]
         )
 
-        # Prevent negative AQI predictions
+        # Prevent a negative numerical AQI estimate
         predicted_aqi = max(0.0, predicted_aqi)
 
-        # Calculate category directly from numerical AQI
-        predicted_category = get_aqi_category(predicted_aqi)
+        # Predict category independently using classification
+        predicted_category = str(
+            clf_model.predict(input_row)[0]
+        )
 
-        # Display results
+        # Display prediction results
         st.divider()
         st.subheader("Prediction Results")
 
@@ -270,29 +268,27 @@ if st.button(
                 "Estimated AQI",
                 f"{predicted_aqi:.1f}"
             )
-
             st.caption(f"Predicted by {reg_name}")
 
         with c2:
             st.metric(
-                "AQI Category",
+                "Predicted AQI Category",
                 predicted_category
             )
+            st.caption(f"Predicted by {clf_name}")
 
-            st.caption("Calculated from estimated AQI")
+        st.caption(
+            "The numerical AQI is predicted using regression, "
+            "while the AQI category is predicted independently "
+            "using classification. The two predictions may differ."
+        )
 
-        # Display explanation
+        # Display category explanation
         st.info(
             category_description(predicted_category)
         )
 
-        st.caption(
-            "The category is calculated from the numerical AQI "
-            "using the configured US-style AQI thresholds. "
-            "The result is an estimate, not an official reading."
-        )
-
-        # Display user inputs
+        # Display user input summary
         st.write("**Input Summary**")
 
         st.dataframe(
@@ -329,7 +325,9 @@ with st.expander("Phase 2 Evaluation Snapshot"):
             hide_index=True
         )
     else:
-        st.write("No regression evaluation metrics available.")
+        st.write(
+            "No regression evaluation metrics available."
+        )
 
     st.write("**Classification comparison (held-out test set)**")
 
@@ -340,12 +338,14 @@ with st.expander("Phase 2 Evaluation Snapshot"):
             hide_index=True
         )
     else:
-        st.write("No classification evaluation metrics available.")
+        st.write(
+            "No classification evaluation metrics available."
+        )
 
     st.caption(
-        "The classification metrics are retained for your Phase 2 "
-        "model comparison. The live AQI category above is now "
-        "calculated from the regression prediction."
+        "The regression and classification models were compared "
+        "using held-out test-set metrics. The live application "
+        "uses both saved models for independent predictions."
     )
 
 
@@ -355,7 +355,7 @@ with st.expander("Phase 2 Evaluation Snapshot"):
 st.divider()
 
 st.caption(
-    "Academic demonstration only. AQI values and category labels "
-    "should not replace readings from official environmental "
-    "monitoring agencies."
+    "Academic demonstration only. AQI estimates and category "
+    "labels should not replace readings from official "
+    "environmental monitoring agencies."
 )
