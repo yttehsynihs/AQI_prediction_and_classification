@@ -22,6 +22,10 @@ bundle = joblib.load(MODEL_PATH)
 
 reg_model = bundle["regression_model"]
 reg_name = bundle["regression_model_name"]
+
+clf_model = bundle["classification_model"]
+clf_name = bundle["classification_model_name"]
+
 cities = bundle["cities"]
 
 # --------------------------------------------------
